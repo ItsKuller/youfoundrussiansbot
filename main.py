@@ -22,7 +22,7 @@ guild_link = f"https://api.hypixel.net/v2/guild?key={hypixel_token}&id={guild_id
 jr_guild_link = f"https://api.hypixel.net/v2/guild?key={hypixel_token}&id={jr_guild_id}"
 player_link = f"https://api.hypixel.net/v2/player?key={hypixel_token}&uuid="
 
-requests_cache.install_cache('hypixel_mojang_cache', expire_after=1800, ignored_headers=['Authorization'])
+requests_cache.install_cache('hypixel_mojang_cache', expire_after=1800, ignored_headers=['Authorization']) # кэш запросов, время хранения 30 минут
 
 # при запуске
 @bot.event
@@ -58,9 +58,9 @@ async def verify(interaction: discord.Interaction, nickname: str):
     guest = ROLES["guest"]
     notVerified = ROLES["notVerified"]
     try:
-        uuid = mojangAPI.get_uuid(username=nickname) # uuid игрока
-        inGameNickname = mojangAPI.get_username(uuid=uuid) # ник игрока
-        player = requests.get(player_link + uuid).json() # массив данных из API
+        uuid = mojangAPI.get_uuid(username=nickname) # uuid игрока из mojangAPI
+        inGameNickname = mojangAPI.get_username(uuid=uuid) # ник игрока из mojangAPI
+        player = requests.get(player_link + uuid).json() # массив данных из HypixelAPI
         discord_tag = player.get("player", {}).get("socialMedia", {}).get("links", {}).get("DISCORD") # дискорд-тег игрока из массива данных
         
         if discord_tag == interaction.user.name:
@@ -74,19 +74,19 @@ async def verify(interaction: discord.Interaction, nickname: str):
             roles_to_remove = notVerified
             rank = "guest"
 
-            if uuid in main:
+            if uuid in main: # если в основной гильдии
                 rank = main[uuid]
                 roles_to_add = [guildmate, ROLES[rank]]
                 roles_to_remove = [notVerified, jrGuildmate]
                 
-            elif uuid in jr:
+            elif uuid in jr: # если в младшей
                 rank = jr[uuid]
                 roles_to_add = [ROLES["jrGuildmate"]]
                 roles_to_remove = [notVerified, guildmate, noLife, professional, skilled]
             
-            if not db.get(interaction.user.id):
+            if not db.get(interaction.user.id): # добавление записи
                 db.add(interaction.user.id, uuid, inGameNickname, rank)
-            else:
+            else: # обновление записи
                 db.update(interaction.user.id, uuid, inGameNickname, rank)
 
             await interaction.user.add_roles(*roles_to_add)
