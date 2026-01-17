@@ -163,6 +163,7 @@ async def verify(interaction: discord.Interaction, nickname: str):
             main = {m["uuid"]: m["rank"] for m in guild_data.get("guild", {}).get("members", [])}
             jr = {m["uuid"]: m["rank"] for m in jr_data.get("guild", {}).get("members", [])}
             
+
             guild_type = "guest"
             rank = "guest"
             roles_to_add = [ROLES["guest"]]
@@ -175,7 +176,7 @@ async def verify(interaction: discord.Interaction, nickname: str):
                     rank = 'guildmate'
                 else:
                     rank = guild_rank_raw
-                roles_to_add = [ROLES["guildmate"]]
+                roles_to_add = [ROLES["guildmate"], ROLES[rank]]
                 roles_to_remove = [ROLES["notVerified"], ROLES["jrGuildmate"]]
                 
             elif uuid in jr:
@@ -186,7 +187,8 @@ async def verify(interaction: discord.Interaction, nickname: str):
                 else:
                     rank = guild_rank_raw
                 roles_to_add = [ROLES["jrGuildmate"]]
-                roles_to_remove = [ROLES["notVerified"], ROLES["guildmate"]]
+                roles_to_remove = [ROLES["notVerified"], ROLES["guildmate"], ROLES["No Life"], ROLES["Professional"], ROLES["Skilled"],]
+
             
             if not db.get(interaction.user.id):
                 db.add(discord_id=interaction.user.id, uuid=uuid, ign=inGameNickname, 
