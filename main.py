@@ -53,7 +53,7 @@ async def update_logic():
                 'jr': jr.get(uuid, 'guest')
             }.get(data['guild_type'], 'guest')
             
-            if guild_rank_raw in ['Guild Master', 'STAFF', 'Member']:
+            if str(guild_rank_raw).lower() in ['Guild Master', 'STAFF', 'Member']:
                 guild_rank = 'guildmate' if data['guild_type'] == 'main' else 'jrGuildmate'
             else:
                 guild_rank = guild_rank_raw
@@ -65,6 +65,7 @@ async def update_logic():
 
             user = members_cache.get(discord_id)
             if user:
+                jrRanks = ["jrGuildmate", "Newbie"]
                 current_rank = guild_rank if guild_rank != data['rank'] else data['rank']
                 
                 if current_rank == "No Life":
@@ -80,7 +81,7 @@ async def update_logic():
                     roles_to_add = [ROLES["guildmate"]]
                     roles_to_remove = [ROLES["No Life"], ROLES["Professional"], ROLES["Skilled"], 
                                      ROLES["guest"], ROLES["jrGuildmate"]]
-                elif current_rank == "jrGuildmate":
+                elif current_rank in jrRanks:
                     roles_to_add = [ROLES["jrGuildmate"]]
                     roles_to_remove = [ROLES["No Life"], ROLES["Professional"], ROLES["Skilled"], 
                                      ROLES["guildmate"], ROLES["guest"]]
@@ -234,14 +235,20 @@ async def stats(interaction: discord.Interaction):
     await interaction.response.defer(ephemeral=False)
     mod_role = interaction.guild.get_role(MOD_ROLE_ID)
     if mod_role not in interaction.user.roles:
-        await interaction.followup.send("Нет прав!", ephemeral=False)
-        return
+       await interaction.followup.send("Нет прав!", ephemeral=False)
+       return
     
     verified = db.get_all()
     stats = {}
     
     for data in verified.values():
         rank = data['rank']
+        if data['guild_type'] == 'jr':    
+            if rank in ["jrGuildmate", "Newbie"]:
+                rank = "jrGuildmate"
+        if data['guild_type'] == 'main':  
+            if rank not in ["No Life", "Professional", "Skilled"]:
+                rank = "guildmate"
         stats[rank] = stats.get(rank, 0) + 1
     
     embed = discord.Embed(

@@ -3,6 +3,8 @@ __pycache__/
 
 # env
 .env
+venv/
+env/
 
 # Базы данных
 *.sqlite
