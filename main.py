@@ -25,8 +25,8 @@ player_link = f"https://api.hypixel.net/v2/player?key={hypixel_token}&uuid="
 
 requests_cache.install_cache('hypixel_mojang_cache', expire_after=1800, ignored_headers=['Authorization']) # кэш запросов, время хранения 30 минут
 members_cache = {}
-guild = discord.Guild
 ROLES = {}
+MOD_ROLE_ID = 1355020383350296596
 
 
 async def update_logic():
@@ -117,14 +117,17 @@ async def on_ready():
     except Exception as e:
         print(f"Ошибка синхронизации: {e}")
 
+
 async def auto_role_sync():
     while True:
         await update_logic()
         await asyncio.sleep(86400)  # 30 минут
 
+
 @bot.event 
 async def on_member_join(member):
     members_cache[member.id] = member
+
 
 @bot.event 
 async def on_member_remove(member):
@@ -190,6 +193,10 @@ async def verify(interaction: discord.Interaction, nickname: str):
 @bot.tree.command(name="update", description="Обновить всех привязанных участников")
 async def update(interaction: discord.Interaction):
     await interaction.response.defer(ephemeral=True)
+    mod_role = interaction.guild.get_role(MOD_ROLE_ID)
+    if mod_role not in interaction.user.roles:
+        await interaction.followup.send("Нет прав!", ephemeral=True)
+        return
     
     try:
         updated = await update_logic()  # Обновляет ВСЕХ пользователей
@@ -198,6 +205,70 @@ async def update(interaction: discord.Interaction):
     except Exception as e:
         await interaction.followup.send(f"Ошибка: {e}", ephemeral=True)
         print(f"Ошибка команды update: {e}")
+
+
+@bot.tree.command(name="stats", description="Показать статистику верифицированных игроков")
+async def stats(interaction: discord.Interaction):
+    await interaction.response.defer(ephemeral=True)
+    mod_role = interaction.guild.get_role(MOD_ROLE_ID)
+    if mod_role not in interaction.user.roles:
+        await interaction.followup.send("Нет прав!", ephemeral=True)
+        return
+    
+    verified = db.get_all()
+    stats = {}
+    
+    for data in verified.values():
+        rank = data['rank']
+        stats[rank] = stats.get(rank, 0) + 1
+    
+    embed = discord.Embed(
+        title="📊 Статистика гильдии",
+        description=f"**Всего верифицировано: {len(verified)} игроков**",
+        color=0x00ff88  # Зеленый
+    )
+    
+    embed.add_field(
+        name="👑 No Life", 
+        value=f"{stats.get('No Life', 0)}", 
+        inline=True
+    )
+    embed.add_field(
+        name="⭐ Professional", 
+        value=f"{stats.get('Professional', 0)}", 
+        inline=True
+    )
+    embed.add_field(
+        name="⚡ Skilled", 
+        value=f"{stats.get('Skilled', 0)}", 
+        inline=True
+    )
+    embed.add_field(
+        name="🛡️ Guildmate", 
+        value=f"{stats.get('guildmate', 0)}", 
+        inline=True
+    )
+    embed.add_field(
+        name="👶 Jr Guildmate", 
+        value=f"{stats.get('jrGuildmate', 0)}", 
+        inline=True
+    )
+    embed.add_field(
+        name="🧑 Guest", 
+        value=f"{stats.get('guest', 0)}", 
+        inline=True
+    )
+    
+    embed.set_footer(
+        text=f"Последнее обновление: {discord.utils.utcnow().strftime('%d.%m.%Y %H:%M')}",
+        icon_url=interaction.user.display_avatar.url
+    )
+    
+    # Миниатюра сервера
+    embed.set_thumbnail(url=interaction.guild.icon.url if interaction.guild.icon else None)
+    
+    await interaction.followup.send(embed=embed, ephemeral=False)
+
 
 
 bot.run(token=os.getenv('discord_token'))
