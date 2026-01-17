@@ -53,7 +53,7 @@ async def update_logic():
                 'jr': jr.get(uuid, 'guest')
             }.get(data['guild_type'], 'guest')
             
-            if str(guild_rank_raw).lower() in ['Guild Master', 'STAFF', 'Member']:
+            if guild_rank_raw in ['Guild Master', 'STAFF', 'Member']:
                 guild_rank = 'guildmate' if data['guild_type'] == 'main' else 'jrGuildmate'
             else:
                 guild_rank = guild_rank_raw
