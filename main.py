@@ -150,7 +150,7 @@ async def on_member_remove(member):
 # основная команда верификации
 @bot.tree.command(name="verify", description="Пройти верификацию на сервере")
 async def verify(interaction: discord.Interaction, nickname: str):
-    await interaction.response.defer(ephemeral=True)
+    await interaction.response.defer()
     
     try:
         uuid = mojangAPI.get_uuid(username=nickname)
@@ -202,11 +202,10 @@ async def verify(interaction: discord.Interaction, nickname: str):
             await interaction.user.remove_roles(*roles_to_remove)
             await interaction.user.add_roles(*roles_to_add)
             
-            await interaction.followup.send(f"Добро пожаловать, **{inGameNickname}**!\nРанг: `{rank}`", 
-                                         ephemeral=True)
+            await interaction.followup.send(f"Добро пожаловать, **{inGameNickname}**!\nРанг: `{rank}`")
             await interaction.user.edit(nick=inGameNickname)
         else:
-            await interaction.followup.send("Discord не привязан или неверный ник!", ephemeral=True)
+            await interaction.followup.send("Discord не привязан или неверный ник!")
             
     except Exception as e:
         print(f"Ошибка verify: {e}")
