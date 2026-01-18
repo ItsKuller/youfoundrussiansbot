@@ -3,6 +3,7 @@ import asyncio
 import discord
 import requests, requests_cache
 from discord.ext import commands
+from discord import app_commands
 from mojang import API as mAPI
 from database import VerificationDatabase
 from dotenv import load_dotenv
@@ -71,20 +72,23 @@ async def update_logic():
                 if current_rank == "No Life":
                     roles_to_add = [ROLES["No Life"], ROLES["guildmate"]]
                     roles_to_remove = [ROLES["Skilled"], ROLES["Professional"], ROLES["guest"], ROLES["jrGuildmate"]]
+
                 elif current_rank == "Professional":
                     roles_to_add = [ROLES["Professional"], ROLES["guildmate"]]
                     roles_to_remove = [ROLES["Skilled"], ROLES["No Life"], ROLES["guest"], ROLES["jrGuildmate"]]
+
                 elif current_rank == "Skilled":
                     roles_to_add = [ROLES["Skilled"], ROLES["guildmate"]]
                     roles_to_remove = [ROLES["No Life"], ROLES["Professional"], ROLES["guest"], ROLES["jrGuildmate"]]
+                    
                 elif current_rank == "guildmate":
                     roles_to_add = [ROLES["guildmate"]]
-                    roles_to_remove = [ROLES["No Life"], ROLES["Professional"], ROLES["Skilled"], 
-                                     ROLES["guest"], ROLES["jrGuildmate"]]
+                    roles_to_remove = [ROLES["No Life"], ROLES["Professional"], ROLES["Skilled"], ROLES["guest"], ROLES["jrGuildmate"]]
+
                 elif current_rank in jrRanks:
                     roles_to_add = [ROLES["jrGuildmate"]]
-                    roles_to_remove = [ROLES["No Life"], ROLES["Professional"], ROLES["Skilled"], 
-                                     ROLES["guildmate"], ROLES["guest"]]
+                    roles_to_remove = [ROLES["No Life"], ROLES["Professional"], ROLES["Skilled"], ROLES["guildmate"], ROLES["guest"]]
+
                 else:
                     roles_to_add = [ROLES["guest"]]
                     roles_to_remove = [ROLES["No Life"], ROLES["Professional"], ROLES["Skilled"], 
@@ -154,6 +158,7 @@ async def verify(interaction: discord.Interaction, nickname: str):
     
     try:
         uuid = mojangAPI.get_uuid(username=nickname)
+
         inGameNickname = mojangAPI.get_username(uuid=uuid)
         player = requests.get(player_link + uuid).json()
         discord_tag = player.get("player", {}).get("socialMedia", {}).get("links", {}).get("DISCORD")
@@ -163,14 +168,10 @@ async def verify(interaction: discord.Interaction, nickname: str):
             jr_data = requests.get(jr_guild_link).json()
             main = {m["uuid"]: m["rank"] for m in guild_data.get("guild", {}).get("members", [])}
             jr = {m["uuid"]: m["rank"] for m in jr_data.get("guild", {}).get("members", [])}
-            
 
-            guild_type = "guest"
-            rank = "guest"
-            roles_to_add = [ROLES["guest"]]
-            roles_to_remove = [ROLES["notVerified"]]
             
             if uuid in main:
+                who = "Гильдмейт"
                 guild_type = "main"
                 guild_rank_raw = main[uuid]
                 if guild_rank_raw in ['Guild Master', 'STAFF', 'Member']:
@@ -179,8 +180,10 @@ async def verify(interaction: discord.Interaction, nickname: str):
                     rank = guild_rank_raw
                 roles_to_add = [ROLES["guildmate"], ROLES[rank]]
                 roles_to_remove = [ROLES["notVerified"], ROLES["jrGuildmate"]]
+                guild_rank = f"**Ваш Guild-Ранг: {guild_rank_raw}**"
                 
             elif uuid in jr:
+                who = "Jr Гильдмейт"
                 guild_type = "jr"
                 guild_rank_raw = jr[uuid]
                 if guild_rank_raw in ['Guild Master', 'STAFF', 'Member']:
@@ -188,7 +191,15 @@ async def verify(interaction: discord.Interaction, nickname: str):
                 else:
                     rank = guild_rank_raw
                 roles_to_add = [ROLES["jrGuildmate"]]
-                roles_to_remove = [ROLES["notVerified"], ROLES["guildmate"], ROLES["No Life"], ROLES["Professional"], ROLES["Skilled"],]
+                roles_to_remove = [ROLES["notVerified"], ROLES["guildmate"], ROLES["No Life"], ROLES["Professional"], ROLES["Skilled"]]
+                guild_rank = f"**Ваш Guild-Ранг: {guild_rank_raw}**"
+            else:
+                guild_type = "guest"
+                rank = "guest"
+                roles_to_add = [ROLES["guest"]]
+                roles_to_remove = [ROLES["notVerified"]]
+                who = "Гость"
+                guild_rank = ""
 
             
             if not db.get(interaction.user.id):
@@ -198,17 +209,29 @@ async def verify(interaction: discord.Interaction, nickname: str):
                 db.update(discord_id=interaction.user.id, uuid=uuid, ign=inGameNickname, 
                          rank=rank, guild_type=guild_type)
             
+
+            success_embed = discord.Embed(title=f"Успешно верифицирован как `{inGameNickname}`! ✅",
+                                          description=f"**Добро пожаловать в YouFoundRussians, {who}!**\n{guild_rank}",
+                                          color=0x3ece6b)
             # Применяем роли
             await interaction.user.remove_roles(*roles_to_remove)
             await interaction.user.add_roles(*roles_to_add)
             
-            await interaction.followup.send(f"Добро пожаловать, **{inGameNickname}**!\nРанг: `{rank}`")
+            await interaction.followup.send(embed=success_embed)
             await interaction.user.edit(nick=inGameNickname)
         else:
-            await interaction.followup.send("Discord не привязан или неверный ник!")
-            
+            discord_embed = discord.Embed(title="Не удалось верифицировать аккаунт! ❌",
+                                          description="**Ваш Discord не привязан к данному аккаунту.**",
+                                          color=0xf83b3b)
+            await interaction.followup.send(embed=discord_embed)
+    except discord.errors.Forbidden:
+        pass
     except Exception as e:
         print(f"Ошибка verify: {e}")
+        error_embed = discord.Embed(title=f"Не удалось верифицировать аккаунт! ❌",
+                                     description="**Возникла внутренняя ошибка при верификации. Убедитесь, что Вы указали правильный никнейм.\n\nЕсли ошибка повторяется, попробуйте еще раз через время.** 🍫",
+                                     color=0xf83b3b)
+        await interaction.followup.send(embed=error_embed)
 
 
 
@@ -297,6 +320,39 @@ async def stats(interaction: discord.Interaction):
     
     await interaction.followup.send(embed=embed, ephemeral=False)
 
+@bot.tree.command(name="force_verify", description="Показать статистику верифицированных игроков")
+@app_commands.choices(guild_type=[
+    app_commands.Choice(name='Main', value='main'),
+    app_commands.Choice(name='Jr', value='jr'),
+    app_commands.Choice(name='Guest', value='guest')
+])
+@app_commands.choices(rank=[
+    app_commands.Choice(name='Guild Master', value='guildmate'),
+    app_commands.Choice(name='STAFF', value='guildmate'),
+    app_commands.Choice(name='No Life', value='No Life'),
+    app_commands.Choice(name='Professional', value='Professional'),
+    app_commands.Choice(name='Skilled', value='Skilled'),
+    app_commands.Choice(name='Member', value='guildmate'),
+    app_commands.Choice(name='Jr Guildmate', value='jrGuildmate'),
+])
+@app_commands.describe(user='Пользователь', ign='Игровой никнейм', rank='Ранг', guild_type='Тип гильдии')
+async def force_verify(interaction: discord.Interaction, user: discord.Member, ign: str, 
+                rank: str, guild_type: str):
+    await interaction.response.defer()
+    mod_role = interaction.guild.get_role(MOD_ROLE_ID)
+    if mod_role not in interaction.user.roles:
+       await interaction.followup.send("Нет прав!", ephemeral=False)
+       return
+    try:
+        if db.get(user.id):
+            db.update(discord_id=user.id, uuid=mojangAPI.get_uuid(ign), ign=ign, rank=rank, guild_type=guild_type)
+        else:
+            db.add(discord_id=user.id, uuid=mojangAPI.get_uuid(ign), ign=ign, rank=rank, guild_type=guild_type)
+
+        await interaction.followup.send(f"Обновлено:\nПользователь: {user.name}\nНик: {ign}\nРанг: {rank}\nGuild Type: {guild_type}")
+    except Exception as e:
+        await interaction.followup.send("Произошла ошибка!")
+        print(e)
 
 
 bot.run(token=os.getenv('discord_token'))
