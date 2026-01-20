@@ -16,7 +16,7 @@ mojangAPI = mAPI()
 db = VerificationDatabase()
 load_dotenv()
 
-hypixel_token = os.getenv("hypixel_token")
+hypixel_token = "aa"
 guild_id = os.getenv("guild_id")
 jr_guild_id = os.getenv("jr_guild_id")
 
@@ -34,6 +34,10 @@ async def update_logic():
     try:
         guild_data = requests.get(guild_link).json()
         jr_data = requests.get(jr_guild_link).json()
+
+        if guild_data.get("success") is not True or jr_data.get("success") is not True:
+            raise Exception("Не удалось получить данные гильдии с Hypixel API.")
+        
         main = {m["uuid"]: m["rank"] for m in guild_data.get("guild", {}).get("members", [])}
         jr = {m["uuid"]: m["rank"] for m in jr_data.get("guild", {}).get("members", [])}
 
@@ -93,7 +97,8 @@ async def update_logic():
                     roles_to_add = [ROLES["guest"]]
                     roles_to_remove = [ROLES["No Life"], ROLES["Professional"], ROLES["Skilled"], 
                                      ROLES["guildmate"], ROLES["jrGuildmate"]]
-                
+
+                   
                 # Применяем роли
                 for role in roles_to_remove:
                     if role and role in user.roles:
